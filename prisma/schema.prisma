@@ -1,0 +1,116 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Site {
+  siteId      String    @id @default(uuid()) @db.VarChar(36)
+  name        String    @db.VarChar(100)
+  address     String?   @db.VarChar(200)
+  phone       String?   @db.VarChar(20)
+  email       String?   @db.VarChar(100)
+  status      Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  
+  students    Student[]
+  plans       Plan[]
+}
+
+model Plan {
+  planId          String    @id @default(uuid()) @db.VarChar(36)
+  siteId          String    @db.VarChar(36)
+  name            String    @db.VarChar(100)
+  monthlyPayments Int       // 5, 8 o 10 mensualidades
+  monthlyAmount   Decimal   @db.Decimal(10,2)
+  inscriptionFee  Decimal   @db.Decimal(10,2)
+  validityMonths  Int       @default(12) // 12 meses + 4 de extensión
+  extensionMonths Int       @default(4)
+  status          Boolean   @default(true)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  
+  site            Site      @relation(fields: [siteId], references: [siteId])
+  memberships     Membership[]
+}
+
+model Membership {
+  membershipId    String    @id @default(uuid()) @db.VarChar(36)
+  planId          String    @db.VarChar(36)
+  startDate       DateTime  @db.Date()
+  endDate         DateTime  @db.Date()
+  extensionDate   DateTime? @db.Date()
+  totalAmount     Decimal   @db.Decimal(10,2)
+  paidAmount      Decimal   @db.Decimal(10,2) @default(0)
+  status          String    @default("active") @db.VarChar(20) // active, completed, cancelled
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  
+  plan            Plan      @relation(fields: [planId], references: [planId])
+  students        Student[]
+  payments        Payment[]
+}
+
+model Student {
+  userId             String    @id @default(uuid())
+  roleId             String    @default("student") @db.VarChar(7)
+  siteId             String    @db.VarChar(36)
+  membershipId       String?   @db.VarChar(36)
+  enrollment         String    @unique
+  username           String    @unique
+  name               String    @db.VarChar(100)
+  lastName           String    @db.VarChar(100)
+  fullName           String    @db.VarChar(200)
+  email              String?   @db.VarChar(100)
+  phone              String?   @db.VarChar(20)
+  password           String
+  picture            String?
+  notification       Boolean   @default(true)
+  changePass         Boolean   @default(true)
+  status             Boolean   @default(true)
+  resetPasswordToken String?
+  expireResetToken   DateTime?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+  registration       DateTime? @db.Date()
+  endLimited         DateTime? @db.Date()
+  expiration         DateTime? @db.Date()
+  expirationExtension DateTime? @db.Date()
+  workshopHours      Int       @default(0)
+  weekCancellation   Int       @default(0)
+  weeklyAbsences     Int       @default(0)
+  weeklyClass        Int       @default(0)
+  clubHours          Int       @default(0)
+  
+  site               Site      @relation(fields: [siteId], references: [siteId])
+  membership         Membership? @relation(fields: [membershipId], references: [membershipId])
+  payments           Payment[]
+}
+
+model Payment {
+  paymentId       String    @id @default(uuid()) @db.VarChar(36)
+  studentId       String
+  membershipId    String?   @db.VarChar(36)
+  receiptNumber   String    @unique
+  amount          Decimal   @db.Decimal(10,2)
+  paymentDate     DateTime  @db.Date()
+  dueDate         DateTime  @db.Date()
+  paymentMethod   String    @db.VarChar(50) // cash, card, transfer, etc.
+  paymentType     String    @db.VarChar(50) // monthly, inscription, late_fee
+  lateFeeDays     Int       @default(0)
+  lateFeeAmount   Decimal   @db.Decimal(10,2) @default(0)
+  status          String    @default("pending") @db.VarChar(20) // paid, pending, cancelled
+  notes           String?   @db.Text
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  
+  student         Student   @relation(fields: [studentId], references: [userId])
+  membership      Membership? @relation(fields: [membershipId], references: [membershipId])
+}
