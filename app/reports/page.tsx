@@ -33,7 +33,7 @@ export default function ReportsPage() {
   const studentReports = [
     {
       enrollment: "ENG001",
-      studentName: "Juan Pérez García",
+      studentName: "Juan Pérez López",
       plan: "Plan 8 Mensualidades",
       totalPaid: 12000,
       pendingAmount: 3000,
@@ -52,7 +52,7 @@ export default function ReportsPage() {
       lastPayment: "2024-01-30",
     },
     {
-      enrollment: "ENG003",
+      enrollment: "233107",
       studentName: "Carlos Rodríguez Sánchez",
       plan: "Plan 5 Mensualidades",
       totalPaid: 4500,
@@ -192,7 +192,7 @@ export default function ReportsPage() {
         </CardContent>
       </Card>
 
-      {/* Reporte Detallado por Alumno */}
+      {/* Reporte Detallado por Alumnos */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center">

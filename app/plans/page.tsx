@@ -25,7 +25,7 @@ export default function PlansPage() {
   const plans = [
     {
       planId: "1",
-      name: "Plan 5 Mensualidades",
+      name: "Plan 7 Mensualidades",
       monthlyPayments: 5,
       monthlyAmount: 1200,
       inscriptionFee: 500,

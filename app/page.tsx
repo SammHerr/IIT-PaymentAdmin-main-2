@@ -2,12 +2,14 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
 import { Users, CreditCard, TrendingUp, AlertTriangle } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import Link from "next/dist/client/link"
 
 export default function Dashboard() {
   // En una implementación real, estos datos vendrían de la API
   const stats = {
     totalStudents: 245,
-    activeStudents: 198,
+    activeStudents: 199,
     expectedAmount: 980000,
     collectedAmount: 350000,
     collectionPercentage: 35.7,
@@ -16,6 +18,15 @@ export default function Dashboard() {
   }
 
   return (
+      <div className="p-4">
+      {/* Header con botón de login */}
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-2xl font-bold">Dashboard</h1>
+        <Link href="/login">
+          <Button variant="outline">Iniciar Sesión</Button>
+        </Link>
+      </div>
+
     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -88,6 +99,8 @@ export default function Dashboard() {
           </div>
         </CardContent>
       </Card>
+    </div>
+
     </div>
   )
 }
