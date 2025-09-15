@@ -4,6 +4,7 @@
 import { useEffect, useState } from "react"
 import { api } from "@/lib/api"
 
+/*
 export type DashboardSummary = {
   period: { year: number; month: number }
   totalStudents: number
@@ -19,6 +20,27 @@ export type DashboardSummary = {
     lateFees: number
   }
 }
+*/
+
+export type DashboardSummary = {
+  totalStudents: number
+  activeStudents: number
+  expectedAmount: number
+  collectedAmount: number
+  collectionPercentage: number
+  overduePayments: number
+  totalLateFees: number
+  breakdown: {
+    monthlyNormal: number
+    inscriptions: number
+    lateFees: number
+    extension: number
+    other: number
+    adjustment: number
+    collectedByTypes?: number
+  }
+}
+
 
 export function useDashboardSummary(month?: number, year?: number) {
   const [data, setData] = useState<DashboardSummary | null>(null)

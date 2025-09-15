@@ -134,59 +134,105 @@ export default function DashboardClient() {
         </CardContent>
       </Card>
 
-      {/* Resumen de Cobranza (desglose) */}
-      <Card className="col-span-full">
-        <CardHeader>
-          <CardTitle>Resumen de Cobranza</CardTitle>
-          <CardDescription>Estado actual de pagos y morosidad</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="grid gap-4 md:grid-cols-3">
-            <div className="space-y-2">
-              <p className="text-sm font-medium">Mensualidades Normales</p>
-              <p className="text-2xl font-bold text-green-600">
-                {loading || authLoading ? (
-                  <LoadingBox />
-                ) : isLocked ? (
-                  <span className="text-muted-foreground/60">
-                    Inicia sesión para ver estos datos
-                  </span>
-                ) : (
-                  <>${data?.breakdown.monthlyNormal.toLocaleString()}</>
-                )}
-              </p>
-            </div>
-            <div className="space-y-2">
-              <p className="text-sm font-medium">Moratorios</p>
-              <p className="text-2xl font-bold text-orange-600">
-                {loading || authLoading ? (
-                  <LoadingBox />
-                ) : isLocked ? (
-                  <span className="text-muted-foreground/60">
-                    Inicia sesión para ver estos datos
-                  </span>
-                ) : (
-                  <>${data?.breakdown.lateFees.toLocaleString()}</>
-                )}
-              </p>
-            </div>
-            <div className="space-y-2">
-              <p className="text-sm font-medium">Inscripciones</p>
-              <p className="text-2xl font-bold text-blue-600">
-                {loading || authLoading ? (
-                  <LoadingBox />
-                ) : isLocked ? (
-                  <span className="text-muted-foreground/60">
-                    Inicia sesión para ver estos datos
-                  </span>
-                ) : (
-                  <>${data?.breakdown.inscriptions.toLocaleString()}</>
-                )}
-              </p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+
+{/* Resumen de Cobranza (desglose) */}
+<Card className="col-span-full">
+  <CardHeader>
+    <CardTitle>Resumen de Cobranza</CardTitle>
+    <CardDescription>Estado actual de pagos y morosidad</CardDescription>
+  </CardHeader>
+
+  <CardContent>
+    <div className="grid gap-4 md:grid-cols-3 lg:grid-cols-6">
+      {/* Mensualidades */}
+      <div className="space-y-2">
+        <p className="text-sm font-medium">Mensualidades</p>
+        <p className="text-2xl font-bold text-green-600">
+          {loading || authLoading ? (
+            <LoadingBox />
+          ) : isLocked ? (
+            <span className="text-muted-foreground/60">Inicia sesión para ver estos datos</span>
+          ) : (
+            <>${data?.breakdown.monthlyNormal.toLocaleString()}</>
+          )}
+        </p>
+      </div>
+
+      {/* Inscripciones */}
+      <div className="space-y-2">
+        <p className="text-sm font-medium">Inscripciones</p>
+        <p className="text-2xl font-bold text-blue-600">
+          {loading || authLoading ? (
+            <LoadingBox />
+          ) : isLocked ? (
+            <span className="text-muted-foreground/60">Inicia sesión para ver estos datos</span>
+          ) : (
+            <>${data?.breakdown.inscriptions.toLocaleString()}</>
+          )}
+        </p>
+      </div>
+
+      {/* Moratorios */}
+      <div className="space-y-2">
+        <p className="text-sm font-medium">Moratorios</p>
+        <p className="text-2xl font-bold text-orange-600">
+          {loading || authLoading ? (
+            <LoadingBox />
+          ) : isLocked ? (
+            <span className="text-muted-foreground/60">Inicia sesión para ver estos datos</span>
+          ) : (
+            <>${data?.breakdown.lateFees.toLocaleString()}</>
+          )}
+        </p>
+      </div>
+
+      {/* Extensión */}
+      <div className="space-y-2">
+        <p className="text-sm font-medium">Extensión</p>
+        <p className="text-2xl font-bold text-purple-400">
+          {loading || authLoading ? (
+            <LoadingBox />
+          ) : isLocked ? (
+            <span className="text-muted-foreground/60">Inicia sesión para ver estos datos</span>
+          ) : (
+            <>${data?.breakdown.extension.toLocaleString()}</>
+          )}
+        </p>
+      </div>
+
+      {/* Otros */}
+      <div className="space-y-2">
+        <p className="text-sm font-medium">Otros</p>
+        <p className="text-2xl font-bold text-amber-400">
+          {loading || authLoading ? (
+            <LoadingBox />
+          ) : isLocked ? (
+            <span className="text-muted-foreground/60">Inicia sesión para ver estos datos</span>
+          ) : (
+            <>${data?.breakdown.other.toLocaleString()}</>
+          )}
+        </p>
+      </div>
+
+      {/* Ajustes */}
+      <div className="space-y-2">
+        <p className="text-sm font-medium">Ajustes</p>
+        <p className="text-2xl font-bold text-cyan-600">
+          {loading || authLoading ? (
+            <LoadingBox />
+          ) : isLocked ? (
+            <span className="text-muted-foreground/60">Inicia sesión para ver estos datos</span>
+          ) : (
+            <>${data?.breakdown.adjustment.toLocaleString()}</>
+          )}
+        </p>
+      </div>
+    </div>
+  </CardContent>
+</Card>
+
+
+
     </div>
   )
 }
