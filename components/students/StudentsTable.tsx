@@ -157,6 +157,7 @@ export default function StudentsTable() {
       {/* Editar */}
       {editId && (
         <EditStudentSheet
+          //id={editId}
           id={editId}
           open={!!editId}
           onOpenChange={(v) => { if (!v) setEditId(null); }}

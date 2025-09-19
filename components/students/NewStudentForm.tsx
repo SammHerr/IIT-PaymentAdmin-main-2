@@ -1,19 +1,24 @@
 "use client";
 
-import * as React from "react";
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import useSWR from "swr";
 import { api } from "@/lib/api";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+  DialogClose,
+} from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
-} from "@/components/ui/dialog";
-import {
-  Select, SelectTrigger, SelectContent, SelectItem, SelectValue,
-} from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { toast } from "@/components/ui/use-toast";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+
+type Plan = { id: number; nombre: string; activo: number | boolean };
 
 type Props = {
   open: boolean;
@@ -21,250 +26,276 @@ type Props = {
   onCreated?: () => void;
 };
 
+const fetcher = (url: string) => api.get(url).then(r => r.data.data ?? r.data);
+
 export default function NewStudentForm({ open, onOpenChange, onCreated }: Props) {
-  const [loading, setLoading] = useState(false);
-  const [err, setErr] = useState<string | null>(null);
+  // ------- planes desde BD -------
+  const { data: planesData, isLoading: loadingPlanes } = useSWR<Plan[]>("/planes", fetcher);
 
-  // campos
-  const [matricula, setMatricula] = useState("");
-  const [nombre, setNombre] = useState("");
-  const [apPat, setApPat] = useState("");
-  const [apMat, setApMat] = useState("");
-  const [fechaNac, setFechaNac] = useState("");
-  const [genero, setGenero] = useState<"M" | "F" | "Otro">("M");
-  const [telefono, setTelefono] = useState("");
-  const [email, setEmail] = useState("");
-  const [direccion, setDireccion] = useState("");
-  const [ciudad, setCiudad] = useState("");
-  const [estado, setEstado] = useState("");
-  const [cp, setCp] = useState("");
-  const [contactoEmer, setContactoEmer] = useState("");
-  const [telEmer, setTelEmer] = useState("");
-  const [relEmer, setRelEmer] = useState("");
-  const [fechaIns, setFechaIns] = useState<string>(() => new Date().toISOString().slice(0,10));
-  const [fechaInicio, setFechaInicio] = useState<string>(() => new Date().toISOString().slice(0,10));
-  const [planId, setPlanId] = useState<string>("1");
-  const [estatus, setEstatus] = useState<"activo"|"graduado"|"baja"|"suspendido"|"saldo_pendiente">("activo");
-  const [motivoBaja, setMotivoBaja] = useState("");
-  const [notas, setNotas] = useState("");
-  const [fotoUrl, setFotoUrl] = useState<string>("");
+  // ------- estado del formulario (campos mínimos + extras que ya usas) -------
+  const [form, setForm] = useState({
+    matricula: "",
+    nombre: "",
+    apellido_paterno: "",
+    apellido_materno: "",
+    fecha_nacimiento: "",
+    genero: "M",
+    telefono: "",
+    email: "",
+    direccion: "",
+    ciudad: "",
+    estado: "",
+    codigo_postal: "",
+    contacto_emergencia: "",
+    telefono_emergencia: "",
+    relacion_emergencia: "",
+    fecha_inscripcion: new Date().toISOString().slice(0, 10),
+    fecha_inicio: new Date().toISOString().slice(0, 10),
+    plan_id: "",
+    estatus: "activo",
+    motivo_baja: "",
+    notas: "",
+    documentos_url: "",
+  });
 
-  const [docUrls, setDocUrls] = useState<string>(""); // coma-separado -> array
+  const [fotoFile, setFotoFile] = useState<File | null>(null);
+  const fotoPreview = useMemo(() => (fotoFile ? URL.createObjectURL(fotoFile) : ""), [fotoFile]);
 
-  const handleUploadPhoto = async (file?: File) => {
-    if (!file) return;
-    const fd = new FormData();
-    fd.append("photo", file);
-    const res = await api.post("/upload/photo", fd, {
-      headers: { "Content-Type": "multipart/form-data" },
-      withCredentials: true,
-    });
-    setFotoUrl(res.data.url);
+  useEffect(() => {
+    if (!open) {
+      setFotoFile(null);
+      setForm((f) => ({ ...f, matricula: "", nombre: "", apellido_paterno: "", apellido_materno: "" }));
+    }
+  }, [open]);
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target;
+    setForm((f) => ({ ...f, [name]: value }));
   };
 
-  const onSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setErr(null);
-    setLoading(true);
-    try {
-      const payload = {
-        matricula: matricula || undefined,
-        nombre,
-        apellido_paterno: apPat,
-        apellido_materno: apMat,
-        fecha_nacimiento: fechaNac,
-        genero,
-        telefono,
-        email,
-        direccion,
-        ciudad,
-        estado,
-        codigo_postal: cp,
-        contacto_emergencia: contactoEmer,
-        telefono_emergencia: telEmer,
-        relacion_emergencia: relEmer,
-        fecha_inscripcion: fechaIns,
-        fecha_inicio: fechaInicio,
-        plan_id: Number(planId),
-        estatus,
-        motivo_baja: motivoBaja,
-        notas,
-        foto_url: fotoUrl,
-        documentos_url: docUrls
-          .split(",")
-          .map(s => s.trim())
-          .filter(Boolean), // array
-      };
 
-      await api.post("/alumnos", payload, { withCredentials: true });
+    if (!form.plan_id) {
+      alert("Selecciona un plan.");
+      return;
+    }
+
+    try {
+      // Si vas a subir foto real, aquí podrías llamar a /upload y tomar la URL resultante.
+      // Por ahora, si no hay foto => "sin fotografía"
+      const foto_url = fotoFile ? "sin_foto_por_ahora" : ""; // <-- cámbialo si implementas /upload
+
+      // documentos_url en textarea: CSV -> array JSON
+      const docsArray =
+        form.documentos_url
+          .split(",")
+          .map((s) => s.trim())
+          .filter(Boolean) ?? [];
+
+      await api.post("/alumnos", {
+        ...form,
+        plan_id: Number(form.plan_id),
+        foto_url, // opcional
+        documentos_url: docsArray,
+      });
 
       onOpenChange(false);
       onCreated?.();
-      toast({ title: "Alumno registrado" });
-      // limpiar
-      setMatricula(""); setNombre(""); setApPat(""); setApMat(""); setFechaNac("");
-      setGenero("M"); setTelefono(""); setEmail(""); setDireccion(""); setCiudad("");
-      setEstado(""); setCp(""); setContactoEmer(""); setTelEmer(""); setRelEmer("");
-      setFechaIns(new Date().toISOString().slice(0,10));
-      setFechaInicio(new Date().toISOString().slice(0,10));
-      setPlanId("1"); setEstatus("activo"); setMotivoBaja(""); setNotas(""); setFotoUrl(""); setDocUrls("");
-    } catch (error: any) {
-      setErr(error?.response?.data?.error || "No se pudo registrar el alumno.");
-    } finally {
-      setLoading(false);
+    } catch (err: any) {
+      console.error(err);
+      alert(err?.response?.data?.error || "Error creando alumno");
     }
   };
 
   return (
-    <Dialog open={open} onOpenChange={(v) => !loading && onOpenChange(v)}>
-      <DialogContent className="sm:max-w-3xl">
-        <DialogHeader>
-          <DialogTitle>Registrar Nuevo Alumno</DialogTitle>
-          <DialogDescription>Completa la información del alumno</DialogDescription>
-        </DialogHeader>
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent
+        className="
+          w-full
+          max-w-[min(100vw-2rem,1000px)]
+          p-0
+        "
+      >
+        <form onSubmit={handleSubmit} className="h-[80vh] flex flex-col">
+          <DialogHeader className="px-6 pt-6">
+            <DialogTitle>Registrar Nuevo Alumno</DialogTitle>
+            <DialogDescription>Completa la información del alumno.</DialogDescription>
+          </DialogHeader>
 
-        <form onSubmit={onSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {/* Identidad */}
-          <div>
-            <Label>Matrícula (opcional)</Label>
-            <Input value={matricula} onChange={(e)=>setMatricula(e.target.value)} />
-          </div>
-          <div>
-            <Label>Nombre *</Label>
-            <Input value={nombre} onChange={(e)=>setNombre(e.target.value)} required />
-          </div>
-          <div>
-            <Label>Apellido Paterno *</Label>
-            <Input value={apPat} onChange={(e)=>setApPat(e.target.value)} required />
-          </div>
-          <div>
-            <Label>Apellido Materno</Label>
-            <Input value={apMat} onChange={(e)=>setApMat(e.target.value)} />
-          </div>
-          <div>
-            <Label>Fecha de Nacimiento</Label>
-            <Input type="date" value={fechaNac} onChange={(e)=>setFechaNac(e.target.value)} />
-          </div>
-          <div>
-            <Label>Género</Label>
-            <Select value={genero} onValueChange={(v)=>setGenero(v as any)}>
-              <SelectTrigger><SelectValue placeholder="Selecciona" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="M">M</SelectItem>
-                <SelectItem value="F">F</SelectItem>
-                <SelectItem value="Otro">Otro</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+          {/* SCROLLABLE CONTENT */}
+          <div className="px-6 pb-6 overflow-y-auto">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label>Nombre *</Label>
+                <Input name="nombre" value={form.nombre} onChange={handleChange} required />
+              </div>
+              <div>
+                <Label>Apellido paterno *</Label>
+                <Input name="apellido_paterno" value={form.apellido_paterno} onChange={handleChange} required />
+              </div>
+              <div>
+                <Label>Apellido materno</Label>
+                <Input name="apellido_materno" value={form.apellido_materno} onChange={handleChange} />
+              </div>
 
-          {/* Contacto */}
-          <div>
-            <Label>Teléfono</Label>
-            <Input value={telefono} onChange={(e)=>setTelefono(e.target.value)} />
-          </div>
-          <div>
-            <Label>Email</Label>
-            <Input type="email" value={email} onChange={(e)=>setEmail(e.target.value)} />
-          </div>
-          <div className="md:col-span-2">
-            <Label>Dirección</Label>
-            <Input value={direccion} onChange={(e)=>setDireccion(e.target.value)} />
-          </div>
-          <div>
-            <Label>Ciudad</Label>
-            <Input value={ciudad} onChange={(e)=>setCiudad(e.target.value)} />
-          </div>
-          <div>
-            <Label>Estado</Label>
-            <Input value={estado} onChange={(e)=>setEstado(e.target.value)} />
-          </div>
-          <div>
-            <Label>Código Postal</Label>
-            <Input value={cp} onChange={(e)=>setCp(e.target.value)} />
-          </div>
+              <div>
+                <Label>Fecha de Nacimiento</Label>
+                <Input type="date" name="fecha_nacimiento" value={form.fecha_nacimiento} onChange={handleChange} />
+              </div>
+              <div>
+                <Label>Género</Label>
+                <Select
+                  value={form.genero}
+                  onValueChange={(v) => setForm((f) => ({ ...f, genero: v }))}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecciona" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="M">M</SelectItem>
+                    <SelectItem value="F">F</SelectItem>
+                    <SelectItem value="Otro">Otro</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
 
-          {/* Emergencia */}
-          <div>
-            <Label>Contacto de Emergencia</Label>
-            <Input value={contactoEmer} onChange={(e)=>setContactoEmer(e.target.value)} />
-          </div>
-          <div>
-            <Label>Teléfono de Emergencia</Label>
-            <Input value={telEmer} onChange={(e)=>setTelEmer(e.target.value)} />
-          </div>
-          <div>
-            <Label>Relación</Label>
-            <Input value={relEmer} onChange={(e)=>setRelEmer(e.target.value)} />
-          </div>
+              <div>
+                <Label>Teléfono</Label>
+                <Input name="telefono" value={form.telefono} onChange={handleChange} />
+              </div>
+              <div>
+                <Label>Email</Label>
+                <Input type="email" name="email" value={form.email} onChange={handleChange} />
+              </div>
 
-          {/* Plan / fechas / estatus */}
-          <div>
-            <Label>Fecha de Inscripción *</Label>
-            <Input type="date" required value={fechaIns} onChange={(e)=>setFechaIns(e.target.value)} />
-          </div>
-          <div>
-            <Label>Fecha de Inicio *</Label>
-            <Input type="date" required value={fechaInicio} onChange={(e)=>setFechaInicio(e.target.value)} />
-          </div>
-          <div>
-            <Label>Plan *</Label>
-            <Select value={planId} onValueChange={setPlanId}>
-              <SelectTrigger><SelectValue placeholder="Seleccionar plan" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="1">Plan Básico</SelectItem>
-                <SelectItem value="2">Plan Intermedio</SelectItem>
-                <SelectItem value="3">Plan Avanzado</SelectItem>
-                <SelectItem value="4">Plan Intensivo</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div>
-            <Label>Estatus *</Label>
-            <Select value={estatus} onValueChange={(v)=>setEstatus(v as any)}>
-              <SelectTrigger><SelectValue placeholder="Estatus" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="activo">Activo</SelectItem>
-                <SelectItem value="graduado">Graduado</SelectItem>
-                <SelectItem value="baja">Baja</SelectItem>
-                <SelectItem value="suspendido">Suspendido</SelectItem>
-                <SelectItem value="saldo_pendiente">Saldo Pendiente</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="md:col-span-2">
-            <Label>Motivo de baja (si aplica)</Label>
-            <Input value={motivoBaja} onChange={(e)=>setMotivoBaja(e.target.value)} />
-          </div>
+              <div className="md:col-span-2">
+                <Label>Dirección</Label>
+                <Input name="direccion" value={form.direccion} onChange={handleChange} />
+              </div>
 
-          {/* Foto */}
-          <div className="md:col-span-2">
-            <Label>Fotografía</Label>
-            <div className="flex items-center gap-3">
-              <Input type="file" accept="image/*" onChange={(e)=>handleUploadPhoto(e.target.files?.[0])} />
-              {fotoUrl ? <span className="text-sm text-muted-foreground">Subida ✓</span> : <span className="text-sm">sin fotografía</span>}
+              <div>
+                <Label>Ciudad</Label>
+                <Input name="ciudad" value={form.ciudad} onChange={handleChange} />
+              </div>
+              <div>
+                <Label>Estado</Label>
+                <Input name="estado" value={form.estado} onChange={handleChange} />
+              </div>
+              <div>
+                <Label>Código Postal</Label>
+                <Input name="codigo_postal" value={form.codigo_postal} onChange={handleChange} />
+              </div>
+
+              <div>
+                <Label>Contacto de Emergencia</Label>
+                <Input name="contacto_emergencia" value={form.contacto_emergencia} onChange={handleChange} />
+              </div>
+              <div>
+                <Label>Teléfono de Emergencia</Label>
+                <Input name="telefono_emergencia" value={form.telefono_emergencia} onChange={handleChange} />
+              </div>
+              <div>
+                <Label>Relación</Label>
+                <Input name="relacion_emergencia" value={form.relacion_emergencia} onChange={handleChange} />
+              </div>
+
+              <div>
+                <Label>Fecha de Inscripción *</Label>
+                <Input type="date" name="fecha_inscripcion" value={form.fecha_inscripcion} onChange={handleChange} required />
+              </div>
+              <div>
+                <Label>Fecha de Inicio *</Label>
+                <Input type="date" name="fecha_inicio" value={form.fecha_inicio} onChange={handleChange} required />
+              </div>
+
+              {/* Plan desde la BD */}
+              <div className="md:col-span-2">
+                <Label>Plan *</Label>
+                <Select
+                  value={form.plan_id}
+                  onValueChange={(v) => setForm((f) => ({ ...f, plan_id: v }))}
+                  disabled={loadingPlanes}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder={loadingPlanes ? "Cargando planes..." : "Seleccionar plan"} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {planesData?.filter(p => !!p.activo).map((p) => (
+                      <SelectItem key={p.id} value={String(p.id)}>
+                        {p.nombre}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <Label>Estatus *</Label>
+                <Select
+                  value={form.estatus}
+                  onValueChange={(v) => setForm((f) => ({ ...f, estatus: v }))}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="activo">Activo</SelectItem>
+                    <SelectItem value="graduado">Graduado</SelectItem>
+                    <SelectItem value="baja">Baja</SelectItem>
+                    <SelectItem value="suspendido">Suspendido</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <Label>Motivo de baja (opcional)</Label>
+                <Input name="motivo_baja" value={form.motivo_baja} onChange={handleChange} />
+              </div>
+
+              {/* Fotografía */}
+              <div className="md:col-span-2">
+                <Label>Fotografía</Label>
+                <div className="flex items-center gap-4">
+                  <Input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => setFotoFile(e.target.files?.[0] ?? null)}
+                  />
+                  <div className="text-sm text-muted-foreground">
+                    {fotoFile ? "archivo seleccionado" : "sin fotografía"}
+                  </div>
+                </div>
+                {fotoPreview ? (
+                  <img src={fotoPreview} alt="preview" className="mt-2 h-24 w-24 rounded object-cover border" />
+                ) : null}
+              </div>
+
+              <div className="md:col-span-2">
+                <Label>Documentos (URLs, separadas por coma)</Label>
+                <Textarea
+                  name="documentos_url"
+                  value={form.documentos_url}
+                  onChange={handleChange}
+                  placeholder='https://example.com/ine.pdf, https://example.com/curp.jpg'
+                />
+              </div>
+
+              <div className="md:col-span-2">
+                <Label>Notas</Label>
+                <Textarea name="notas" value={form.notas} onChange={handleChange} />
+              </div>
             </div>
           </div>
 
-          {/* Documentos / notas */}
-          <div className="md:col-span-2">
-            <Label>Documentos (URLs, separadas por coma)</Label>
-            <Input value={docUrls} onChange={(e)=>setDocUrls(e.target.value)} placeholder="https://... , https://..." />
-          </div>
-          <div className="md:col-span-2">
-            <Label>Notas</Label>
-            <Textarea value={notas} onChange={(e)=>setNotas(e.target.value)} />
-          </div>
-
-          {err && <p className="text-sm text-red-600 md:col-span-2">{err}</p>}
-
-          <div className="md:col-span-2 flex justify-end gap-2 pt-2">
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={loading}>
-              Cancelar
-            </Button>
-            <Button type="submit" disabled={loading}>
-              {loading ? "Guardando..." : "Registrar Alumno"}
-            </Button>
-          </div>
+          <DialogFooter className="px-6 pb-6">
+            <DialogClose asChild>
+              <Button type="button" variant="outline">
+                Cancelar
+              </Button>
+            </DialogClose>
+            <Button type="submit">Registrar Alumno</Button>
+          </DialogFooter>
         </form>
       </DialogContent>
     </Dialog>
