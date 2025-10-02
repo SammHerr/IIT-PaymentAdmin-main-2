@@ -1,205 +1,185 @@
-"use client"
+'use client'
 
-import { useState } from "react"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { DatePickerWithRange } from "@/components/ui/date-range-picker"
-import { Badge } from "@/components/ui/badge"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Download, FileText, BarChart3, PieChart } from "lucide-react"
-import type { DateRange } from "react-day-picker"
+import { useMemo, useState } from 'react'
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
+import { Progress } from '@/components/ui/progress'
+import { Download, Calendar, BarChart3 } from 'lucide-react'
+import { useReporteResumen, useReporteAlumnos } from '@/hooks/useReports'
+
+// Util simple para formatear moneda
+const money = (n: number | undefined | null) =>
+  `$${Number(n ?? 0).toLocaleString('en-US', { maximumFractionDigits: 0 })}`
 
 export default function ReportsPage() {
-  const [reportType, setReportType] = useState("monthly")
-  const [dateRange, setDateRange] = useState<DateRange | undefined>()
-  const [filterStatus, setFilterStatus] = useState("all")
+  // Filtros básicos: tipo reporte y rango de fechas (simple: mes actual)
+  const [tipo, setTipo] = useState<'mensual' | 'personalizado'>('mensual')
+  const [range, setRange] = useState<{ fecha_desde?: string; fecha_hasta?: string }>(() => {
+    const d = new Date()
+    const y = d.getFullYear()
+    const m = `${d.getMonth() + 1}`.padStart(2, '0')
+    const desde = `${y}-${m}-01`
+    const hasta = new Date(y, d.getMonth() + 1, 0).toISOString().slice(0, 10)
+    return { fecha_desde: desde, fecha_hasta: hasta }
+  })
 
-  // Datos de ejemplo para reportes
-  const monthlyReport = {
-    period: "Enero 2024",
-    totalStudents: 245,
-    activeStudents: 198,
-    graduatedStudents: 32,
-    inactiveStudents: 15,
-    expectedRevenue: 980000,
-    actualRevenue: 350000,
-    collectionRate: 35.7,
-    lateFees: 15600,
-    newEnrollments: 12,
-    dropouts: 3,
-  }
+  const { data: resumenResp, isLoading: loadResumen } = useReporteResumen(range)
+  const resumen = resumenResp?.data
 
-  const studentReports = [
-    {
-      enrollment: "ENG001",
-      studentName: "Juan Pérez López",
-      plan: "Plan 8 Mensualidades",
-      totalPaid: 12000,
-      pendingAmount: 3000,
-      lateFees: 375,
-      status: "active",
-      lastPayment: "2024-01-15",
-    },
-    {
-      enrollment: "ENG002",
-      studentName: "María López Hernández",
-      plan: "Plan 10 Mensualidades",
-      totalPaid: 18000,
-      pendingAmount: 0,
-      lateFees: 0,
-      status: "graduated",
-      lastPayment: "2024-01-30",
-    },
-    {
-      enrollment: "233107",
-      studentName: "Carlos Rodríguez Sánchez",
-      plan: "Plan 5 Mensualidades",
-      totalPaid: 4500,
-      pendingAmount: 1500,
-      lateFees: 360,
-      status: "active",
-      lastPayment: "2023-12-15",
-    },
-  ]
+  const { data: alumnosResp, isLoading: loadAlumnos } = useReporteAlumnos(range)
+  const top = alumnosResp?.data.topAtraso ?? []
 
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case "active":
-        return <Badge variant="default">Activo</Badge>
-      case "graduated":
-        return <Badge variant="secondary">Graduado</Badge>
-      case "inactive":
-        return <Badge variant="destructive">Baja</Badge>
-      default:
-        return <Badge variant="outline">{status}</Badge>
-    }
-  }
+  const pct = useMemo(() => resumen?.tasa_cobranza ?? 0, [resumen])
 
-  const generateReport = () => {
-    // Aquí se implementaría la lógica para generar el reporte
-    console.log("Generando reporte:", { reportType, dateRange, filterStatus })
+  const handleExport = () => {
+    // Exportación rápida: CSV cliente del “top atraso”
+    const rows = [
+      ['Matricula', 'Alumno', 'Mensualidades Vencidas', 'Monto Vencido', 'Max Días Vencido'],
+      ...top.map(r => [
+        r.matricula ?? '',
+        r.nombre_alumno,
+        String(r.mensualidades_vencidas),
+        String(r.monto_vencido),
+        String(r.dias_max_vencido),
+      ]),
+    ]
+    const csv = rows.map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n')
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = 'reporte_alumnos.csv'
+    a.click()
+    URL.revokeObjectURL(url)
   }
 
   return (
     <div className="space-y-4">
-      {/* Filtros de Reportes */}
+      {/* Filtros */}
       <Card>
         <CardHeader>
           <CardTitle>Generador de Reportes</CardTitle>
           <CardDescription>Configura los parámetros para generar reportes personalizados</CardDescription>
         </CardHeader>
-        <CardContent>
-          <div className="grid gap-4 md:grid-cols-4">
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Tipo de Reporte</label>
-              <Select value={reportType} onValueChange={setReportType}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="monthly">Reporte Mensual</SelectItem>
-                  <SelectItem value="student">Por Alumno</SelectItem>
-                  <SelectItem value="plan">Por Plan</SelectItem>
-                  <SelectItem value="collections">Cobranza</SelectItem>
-                  <SelectItem value="overdue">Morosidad</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+        <CardContent className="grid gap-3 md:grid-cols-4">
+          <div className="space-y-1">
+            <p className="text-sm text-muted-foreground">Tipo de Reporte</p>
+            <Select value={tipo} onValueChange={(v: any) => setTipo(v)}>
+              <SelectTrigger>
+                <SelectValue placeholder="Selecciona" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="mensual">Reporte Mensual</SelectItem>
+                <SelectItem value="personalizado">Personalizado</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
 
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Rango de Fechas</label>
-              <DatePickerWithRange date={dateRange} setDate={setDateRange} />
+          <div className="space-y-1">
+            <p className="text-sm text-muted-foreground">Rango de Fechas</p>
+            <div className="flex items-center gap-2">
+              <Calendar className="h-4 w-4 text-muted-foreground" />
+              <input
+                type="date"
+                className="border rounded px-2 py-1 w-[140px]"
+                value={range.fecha_desde ?? ''}
+                onChange={e => setRange(r => ({ ...r, fecha_desde: e.target.value }))}
+              />
+              <span className="text-muted-foreground">—</span>
+              <input
+                type="date"
+                className="border rounded px-2 py-1 w-[140px]"
+                value={range.fecha_hasta ?? ''}
+                onChange={e => setRange(r => ({ ...r, fecha_hasta: e.target.value }))}
+              />
             </div>
+          </div>
 
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Filtrar por Estado</label>
-              <Select value={filterStatus} onValueChange={setFilterStatus}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todos</SelectItem>
-                  <SelectItem value="active">Activos</SelectItem>
-                  <SelectItem value="graduated">Graduados</SelectItem>
-                  <SelectItem value="inactive">Dados de Baja</SelectItem>
-                  <SelectItem value="overdue">Morosos</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+          <div className="space-y-1">
+            <p className="text-sm text-muted-foreground">Filtrar por Estado</p>
+            <Select defaultValue="todos">
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="todos">Todos</SelectItem>
+                <SelectItem value="activo">Activos</SelectItem>
+                <SelectItem value="graduado">Graduados</SelectItem>
+                <SelectItem value="baja">Bajas</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
 
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Acciones</label>
-              <div className="flex space-x-2">
-                <Button onClick={generateReport}>
-                  <BarChart3 className="h-4 w-4 mr-2" />
-                  Generar
-                </Button>
-                <Button variant="outline">
-                  <Download className="h-4 w-4 mr-2" />
-                  Exportar
-                </Button>
-              </div>
-            </div>
+          <div className="flex items-end gap-2">
+            <Button className="w-full" variant="default">
+              <BarChart3 className="h-4 w-4 mr-2" />
+              Generar
+            </Button>
+            <Button className="w-full" variant="outline" onClick={handleExport}>
+              <Download className="h-4 w-4 mr-2" />
+              Exportar
+            </Button>
           </div>
         </CardContent>
       </Card>
 
-      {/* Resumen Mensual */}
+      {/* Resumen */}
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm">Monto Esperado</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{money(resumen?.esperado)}</div>
+            <p className="text-xs text-muted-foreground">
+              {new Date(range.fecha_desde ?? '').toLocaleString('es-MX', { month: 'long', year: 'numeric' })}
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm">Monto Cobrado</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-green-600">{money(resumen?.cobrado)}</div>
+            <Progress value={pct} className="mt-2" />
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm">Tasa de Cobranza</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{(resumen?.tasa_cobranza ?? 0).toFixed(1)}%</div>
+            <Badge variant="secondary" className="mt-2">
+              {pct < 50 ? 'Baja' : pct < 80 ? 'Media' : 'Alta'}
+            </Badge>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm">Moratorios Acumulados</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-orange-600">{money(resumen?.moratorios_totales)}</div>
+            <p className="text-xs text-muted-foreground">
+              {resumen?.alumnos_con_atraso ?? 0} alumnos morosos
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Tabla “Reporte Detallado por Alumno” */}
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center">
-            <PieChart className="h-5 w-5 mr-2" />
-            Resumen Mensual - {monthlyReport.period}
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-            <div className="space-y-2">
-              <p className="text-sm font-medium text-muted-foreground">Total de Alumnos</p>
-              <p className="text-2xl font-bold">{monthlyReport.totalStudents}</p>
-              <div className="text-xs text-muted-foreground">
-                <span className="text-green-600">{monthlyReport.activeStudents} activos</span> •
-                <span className="text-blue-600"> {monthlyReport.graduatedStudents} graduados</span> •
-                <span className="text-red-600"> {monthlyReport.inactiveStudents} bajas</span>
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <p className="text-sm font-medium text-muted-foreground">Ingresos</p>
-              <p className="text-2xl font-bold text-green-600">${monthlyReport.actualRevenue.toLocaleString()}</p>
-              <p className="text-xs text-muted-foreground">
-                de ${monthlyReport.expectedRevenue.toLocaleString()} esperados
-              </p>
-            </div>
-
-            <div className="space-y-2">
-              <p className="text-sm font-medium text-muted-foreground">Tasa de Cobranza</p>
-              <p className="text-2xl font-bold">{monthlyReport.collectionRate}%</p>
-              <Badge variant={monthlyReport.collectionRate > 70 ? "default" : "destructive"}>
-                {monthlyReport.collectionRate > 70 ? "Buena" : "Baja"}
-              </Badge>
-            </div>
-
-            <div className="space-y-2">
-              <p className="text-sm font-medium text-muted-foreground">Moratorios</p>
-              <p className="text-2xl font-bold text-orange-600">${monthlyReport.lateFees.toLocaleString()}</p>
-              <p className="text-xs text-muted-foreground">
-                Nuevos: {monthlyReport.newEnrollments} • Bajas: {monthlyReport.dropouts}
-              </p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Reporte Detallado por Alumnos */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center">
-            <FileText className="h-5 w-5 mr-2" />
-            Reporte Detallado por Alumno
-          </CardTitle>
-          <CardDescription>Estado financiero individual de cada estudiante</CardDescription>
+          <CardTitle>Reporte Detallado por Alumno</CardTitle>
+          <CardDescription>Estado financiero individual</CardDescription>
         </CardHeader>
         <CardContent>
           <Table>
@@ -207,29 +187,30 @@ export default function ReportsPage() {
               <TableRow>
                 <TableHead>Matrícula</TableHead>
                 <TableHead>Alumno</TableHead>
-                <TableHead>Plan</TableHead>
-                <TableHead>Total Pagado</TableHead>
-                <TableHead>Monto Pendiente</TableHead>
-                <TableHead>Moratorios</TableHead>
-                <TableHead>Estado</TableHead>
-                <TableHead>Último Pago</TableHead>
+                <TableHead className="text-right">Mensualidades vencidas</TableHead>
+                <TableHead className="text-right">Monto vencido</TableHead>
+                <TableHead className="text-right">Máx. días vencido</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {studentReports.map((student) => (
-                <TableRow key={student.enrollment}>
-                  <TableCell className="font-medium">{student.enrollment}</TableCell>
-                  <TableCell>{student.studentName}</TableCell>
-                  <TableCell>{student.plan}</TableCell>
-                  <TableCell className="text-green-600">${student.totalPaid.toLocaleString()}</TableCell>
-                  <TableCell className={student.pendingAmount > 0 ? "text-red-600" : "text-green-600"}>
-                    ${student.pendingAmount.toLocaleString()}
+              {top.map((r) => (
+                <TableRow key={r.alumno_id}>
+                  <TableCell className="font-medium">{r.matricula ?? '—'}</TableCell>
+                  <TableCell>{r.nombre_alumno}</TableCell>
+                  <TableCell className="text-right">{r.mensualidades_vencidas}</TableCell>
+                  <TableCell className="text-right" style={{ color: '#ef4444' }}>
+                    {money(r.monto_vencido)}
                   </TableCell>
-                  <TableCell className="text-orange-600">${student.lateFees.toLocaleString()}</TableCell>
-                  <TableCell>{getStatusBadge(student.status)}</TableCell>
-                  <TableCell>{new Date(student.lastPayment).toLocaleDateString()}</TableCell>
+                  <TableCell className="text-right">{r.dias_max_vencido}</TableCell>
                 </TableRow>
               ))}
+              {!loadAlumnos && top.length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={5} className="text-center text-muted-foreground">
+                    No hay datos para el rango seleccionado
+                  </TableCell>
+                </TableRow>
+              )}
             </TableBody>
           </Table>
         </CardContent>
